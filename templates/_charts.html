@@ -1,12 +1,11 @@
 {# TSUNG report charts #}
 
-{% macro chart(title, xheader, yheader, dataset) %}
-  <canvas id="chart"></canvas>
-  <script>
-    const datasets = {{ dataset }};
-    new Chart(document.getElementById('chart').getContext('2d'), {
+{% macro chart(chart_name, title, xheader, yheader, dataset) %}
+    const ctx_{{ chart_name }} = document.getElementById('chart_{{ chart_name }}').getContext('2d');
+    const dataset_{{ chart_name }} = {{ dataset }};
+    new Chart(ctx_{{ chart_name }}, {
       type: 'line',
-      data: { datasets },
+      data: { datasets: dataset_{{ chart_name }} },
       options: {
         responsive: true,
         plugins: {
@@ -20,11 +19,18 @@
         }
       }
     });
-  </script>
 {%- endmacro %}
 
+<div style="width: 80%; margin: 0 auto;">
+    {% for chart_name, data in charts.items() %}
+            <h2> {{ data.title }} </h2>
+            <canvas id="chart_{{ chart_name }}"></canvas>
+    {% endfor %}
+</div>
 
-{% for key, data in charts.items() %}
-        <h2> {{ data.title }} </h2>
-        {{ chart(data.title, data.xheader, data.yheader, data.json) }}
+<script>
+{% for chart_name, data in charts.items() %}
+        {{ chart(chart_name, data.title, data.xheader, data.yheader, data.json) }}
 {% endfor %}
+</script>
+

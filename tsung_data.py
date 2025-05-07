@@ -10,6 +10,7 @@ Read TSUNG tsung.log file, convert to dict with data.
 """
 from collections import namedtuple
 import json
+from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
 
@@ -72,6 +73,12 @@ charts = {
         'title': 'Mean transaction duration',
         'xheader': 'time (sec of running test)',
         'yheader': 'transaction duration (msec)',
+        'data': []
+    },
+    'transactions_rate': {
+        'title': 'Transaction rate',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'transactions/sec',
         'data': []
     },
 }
@@ -154,6 +161,7 @@ class Tsung:
 
         self.start_timestamp = int(self.data[0]['timestamp'])
         all_names = [name for category, names in self.names.items() for name in names]
+        print(f'{all_names=}')
         for name in all_names:
             for block in self.data:
                 timestamp = int(block['timestamp'])
@@ -163,7 +171,7 @@ class Tsung:
                 # the first value for this name
                 if not self.count.get(name):
                     self.count[name]= {'timestamp': timestamp, 'data': []}
-                self.count[name]['data'].append(d.cout_10sec)
+                self.count[name]['data'].append(int(d.cout_10sec))
 
                 # only Data, not DataCount has mean_10sec value
                 if len(d) > 3:
@@ -172,7 +180,9 @@ class Tsung:
                     self.mean[name]['data'].append(d.mean_10sec)
 
         # print(f'mean: {self.mean}')
-        # print(f'count: {self.count}')
+        print(f'mean keys: {self.mean.keys()}')
+        print(f'count keys: {self.count.keys()}')
+        print(f'count: {self.count}')
 
     def add_name_by_category(self, name: str):
         """Add name to self.names."""
@@ -211,14 +221,11 @@ class Tsung:
         table['transaction']['data'] = d
         return table
 
-    def charts(self):
-        """Fill charts dictionary after parsing and return it."""
-        # todo: fill charts data
-        charts_data = charts.copy()
-
+    def one_chart_data(self, names: Sequence[str], get_data_by_name) -> list[dict]:
+        """Build (x,y) data for all chart series by names and get_data_by_name function."""
         lines_data = []
-        for name in sorted(self.names['transaction']):
-            data = self.mean[name]
+        for name in sorted(names):
+            data = get_data_by_name(name)
             y = data['data']
             ylen = len(y)
             x0 = (data['timestamp'] - self.start_timestamp) // 10
@@ -231,8 +238,27 @@ class Tsung:
                 "data": points
             }
             lines_data.append(line_data)
+
+        return lines_data
+
+    def charts(self):
+        """Fill charts dictionary after parsing and return it."""
+        # todo: fill charts data
+        charts_data = charts.copy()
+        # Mean transaction duration
+        lines_data = self.one_chart_data(self.names['transaction'], lambda name: self.mean[name])
         charts_data['transactions_mean']['data'] = lines_data
         charts_data['transactions_mean']['json'] = json.dumps(lines_data)
+
+        # Transaction rate
+        lines_data = self.one_chart_data(self.names['transaction'],
+            lambda _name: {
+                'timestamp': self.count[_name]['timestamp'],
+                'data': [x / 10 for x in self.count[_name]['data']]
+            })
+        charts_data['transactions_rate']['data'] = lines_data
+        charts_data['transactions_rate']['json'] = json.dumps(lines_data)
+
         return charts_data
 
     def table_transactions(self) -> list[tuple]:

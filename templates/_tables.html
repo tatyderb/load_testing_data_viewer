@@ -4,9 +4,11 @@
 
 <table>
     <thead>
-        {% for key in headers %}
+    <tr>
+        {% for key in headers -%}
             <th> {{ key }} </th>
-        {% endfor %}
+        {%- endfor %}
+    </tr>
     </thead>
     <tbody>
         {% for row in data %}

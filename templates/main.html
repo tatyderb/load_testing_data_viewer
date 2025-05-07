@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Mean transaction and page duration at {{ title }}</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body   { margin:0; padding:2rem; font-family:system-ui, sans-serif; }
+    canvas { max-width:100%; height:80vh; }
+  </style>
+</head>
+<body>
+
+    {% include "_tables.html" %}
+
+    {% include "_charts.html" %}
+
+
+
+  {% block content %}
+    <h1>Welcome to {{ title }}!</h1>
+  {% endblock content %}
+
+</body>
+</html>

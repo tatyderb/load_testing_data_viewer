@@ -1,0 +1,27 @@
+{# TSUNG report tables #}
+
+{% macro table(headers, data) %}
+
+<table>
+    <thead>
+        {% for key in headers %}
+            <th> {{ key }} </th>
+        {% endfor %}
+    </thead>
+    <tbody>
+        {% for row in data %}
+            <tr>
+                {% for cell in row -%}
+                    <td>{{ cell }}</td>
+                {%- endfor %}
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{%- endmacro %}
+
+
+{% for key, data in tables.items() %}
+        <h2> {{ data.title }} </h2>
+        {{ table(data.header, data.data) }}
+{% endfor %}

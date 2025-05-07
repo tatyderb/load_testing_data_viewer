@@ -22,6 +22,8 @@
 
 
 {% for key, data in tables.items() %}
+    {%- if data.data -%}
         <h2> {{ data.title }} </h2>
         {{ table(data.header, data.data) }}
+    {%- endif -%}
 {% endfor %}

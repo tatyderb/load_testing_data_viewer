@@ -67,6 +67,15 @@ tables = {
     }
 }
 
+charts = {
+    'transactions_mean': {
+        'title': 'Mean transaction duration',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'transaction duration (msec)',
+        'data': []
+    },
+}
+
 Data = namedtuple('Data', 'name cout_10sec mean_10sec stddev_10sec max min mean count')
 DataCounter = namedtuple('DataCounter', 'count_10sec total')
 
@@ -81,6 +90,7 @@ class Tsung:
     IGNORE_TRANSACTIONS = {'tr_rand_name', 'tr_set_var', 'tr_readfile', 'tr_rand_name', 'tr_get_host_name'}
 
     def __init__(self):
+        self.start_timestamp: int = 0    # int(self.data[0]['timestamp']) - начало теста
         # self.data = [
         #   {'timestamp': 1746441567},
         #   {'timestamp': 1746441577, 'tr_rand_name': Data(name='tr_rand_name', cout_10sec='3', mean_10sec='0.35333333333333333', stddev_10sec='0.10977654070378101', max='0.481', min='0.213', mean='0', count='0'), 'tr_get_host_name': Data(name='tr_get_host_name', cout_10sec='1', mean_10sec='0.211', stddev_10sec='0', max='0.211', min='0.211', mean='0', count='0'), 'tr_profile': Data(name='tr_profile', cout_10sec='1', mean_10sec='92.286', stddev_10sec='0', max='92.286', min='92.286', mean='0', count='0'), 'tr_cb_balance': Data(name='tr_cb_balance', cout_10sec='2', mean_10sec='78.20349999999999', stddev_10sec='0.6774999999999984', max='78.881', min='77.526', mean='0', count='0'), 'tr_deposit': Data(name='tr_deposit', cout_10sec='2', mean_10sec='210.4145', stddev_10sec='94.92249999999999', max='305.337', min='115.492', mean='0', count='0'), 'tr_cb_bet': Data(name='tr_cb_bet', cout_10sec='1', mean_10sec='128.603', stddev_10sec='0', max='128.603', min='128.603', mean='0', count='0'), 'tr_cb_liveness': Data(name='tr_cb_liveness', cout_10sec='2', mean_10sec='57.5655', stddev_10sec='0.23550000000000182', max='57.801', min='57.33', mean='0', count='0'), 'tr_set_var': Data(name='tr_set_var', cout_10sec='1', mean_10sec='1.319', stddev_10sec='0', max='1.319', min='1.319', mean='0', count='0'), 'tr_game_init_by_alias_100hp': Data(name='tr_game_init_by_alias_100hp', cout_10sec='1', mean_10sec='516.781', stddev_10sec='0', max='516.781', min='516.781', mean='0', count='0'), 'tr_registration': Data(name='tr_registration', cout_10sec='1', mean_10sec='853.515', stddev_10sec='0', max='853.515', min='853.515', mean='0', count='0'), 'tr_cb_win': Data(name='tr_cb_win', cout_10sec='1', mean_10sec='120.871', stddev_10sec='0', max='120.871', min='120.871', mean='0', count='0')},
@@ -116,13 +126,10 @@ class Tsung:
                 line = line.strip()
                 if not line:
                     continue
-                print(line)
                 if line.startswith(self.PREFIX_HEADER):
                     # '# stats: dump at 1746469501' - get timestamp
                     if data:
                         self.data.append(data)
-                        print('-------')
-                        print(self.data)
                     data = {'timestamp': int(line[self.PREFIX_HEADER_LENGTH:])}
 
                 # skip line up to name
@@ -132,7 +139,6 @@ class Tsung:
                     words = line.split()
                     d = Data(words[0], *map(number, words[1:]))
                     data[d.name] = d
-                    print(d)
         self.data.append(data)
         # print(json.dumps(self.data, indent=4))
 
@@ -146,7 +152,7 @@ class Tsung:
         # some transactions should be ignored
         self.names['transaction'] -= self.IGNORE_TRANSACTIONS
 
-        start_timestamp = int(self.data[0]['timestamp'])
+        self.start_timestamp = int(self.data[0]['timestamp'])
         all_names = [name for category, names in self.names.items() for name in names]
         for name in all_names:
             for block in self.data:
@@ -165,8 +171,8 @@ class Tsung:
                         self.mean[name]= {'timestamp': timestamp, 'data': []}
                     self.mean[name]['data'].append(d.mean_10sec)
 
-        print(f'mean: {self.mean}')
-        print(f'count: {self.count}')
+        # print(f'mean: {self.mean}')
+        # print(f'count: {self.count}')
 
     def add_name_by_category(self, name: str):
         """Add name to self.names."""
@@ -183,32 +189,51 @@ class Tsung:
 
     def tables(self):
         """Fill tables dictionary after parsing and return it."""
-        t = tables.copy()
+        table = tables.copy()
         # todo: fill tables data
         # transactions
         d = []
         for name in sorted(self.names['transaction']):
-            values = self.mean[name]['data']
-            print(f'{name=} {values=}')
-            highest_mean = max(values)
-            lowest_mean = min(values)
-            mean = sum(values) / len(values)
+            values_without_zero = [value for value, count in zip(self.mean[name]['data'], self.count[name]['data']) if count > 0]
+            # print(f'{name=} {values_without_zero=}')
+            highest_mean = max(values_without_zero)
+            lowest_mean = min(values_without_zero)
+            mean = sum(values_without_zero) / len(values_without_zero)
 
             total = sum(self.count[name]['data'])
-            rates = [1/count for count in self.count[name]['data']]
+            rates = [count/10 for count in self.count[name]['data']]
             highest_rate = max(rates)
             mean_rate = sum(rates) / len(rates)
             d.append([name,
                       str_sec(highest_mean), str_sec(lowest_mean),
                       str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
                       str_sec(mean), total])
-        t['transaction']['data'] = d
-        return t
+        table['transaction']['data'] = d
+        return table
 
     def charts(self):
         """Fill charts dictionary after parsing and return it."""
         # todo: fill charts data
-        return {}
+        charts_data = charts.copy()
+
+        lines_data = []
+        for name in sorted(self.names['transaction']):
+            data = self.mean[name]
+            y = data['data']
+            ylen = len(y)
+            x0 = (data['timestamp'] - self.start_timestamp) // 10
+            points = [{'x': x, 'y': y} for x, y in zip(range(x0, x0 + ylen * 10, 10), y)]
+
+            line_data = {
+                "label": name,
+                "fill": False,
+                "tension": 0,
+                "data": points
+            }
+            lines_data.append(line_data)
+        charts_data['transactions_mean']['data'] = lines_data
+        charts_data['transactions_mean']['json'] = json.dumps(lines_data)
+        return charts_data
 
     def table_transactions(self) -> list[tuple]:
         """Return Transactions table data as list of tuples

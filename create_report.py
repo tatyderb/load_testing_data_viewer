@@ -10,7 +10,8 @@ def create_report(report_date: str, tables: dict, charts: dict):
     filename = f"report_{report_date}.html"
     content = template.render(
         title = report_date,
-        tables=tables
+        tables=tables,
+        charts=charts
     )
     with open(filename, mode="w", encoding="utf-8") as message:
         message.write(content)

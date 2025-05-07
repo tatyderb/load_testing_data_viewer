@@ -1,0 +1,30 @@
+{# TSUNG report charts #}
+
+{% macro chart(title, xheader, yheader, dataset) %}
+  <canvas id="chart"></canvas>
+  <script>
+    const datasets = {{ dataset }};
+    new Chart(document.getElementById('chart').getContext('2d'), {
+      type: 'line',
+      data: { datasets },
+      options: {
+        responsive: true,
+        plugins: {
+          title:  { display:true, text:'{{ title }}' },
+          legend: { position:'bottom' }
+        },
+        parsing: false,                    // мы уже передали {x,y}
+        scales: {
+          x: { type:'linear', title:{ display:true, text:'{{ xheader }}' } },
+          y: {           title:{ display:true, text:'{{ yheader }}'       } }
+        }
+      }
+    });
+  </script>
+{%- endmacro %}
+
+
+{% for key, data in charts.items() %}
+        <h2> {{ data.title }} </h2>
+        {{ chart(data.title, data.xheader, data.yheader, data.json) }}
+{% endfor %}

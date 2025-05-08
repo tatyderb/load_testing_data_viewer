@@ -81,6 +81,12 @@ charts = {
         'yheader': 'transactions/sec',
         'data': []
     },
+    'match_rate': {
+        'title': 'Matching responses',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'number/sec',
+        'data': []
+    },
     'http_rate': {
         'title': 'HTTP code response rate',
         'xheader': 'time (sec of running test)',
@@ -167,6 +173,12 @@ class Tsung:
                     d = DataCounter(*words)
                     data[name] = d
 
+                # match records
+                elif 'match' in name:
+                    # stats: nomatch 362 469
+                    d = DataCounter(*words)
+                    data[name] = d
+
         self.data.append(data)
         # print(json.dumps(self.data, indent=4))
 
@@ -245,6 +257,18 @@ class Tsung:
                       str_sec(mean), total])
         table['transaction']['data'] = d
 
+        # matching report (same as http table, except name)
+        d = []
+        for name in sorted(self.names['match']):
+            total = sum(self.count[name]['data'])
+            rate_without_zero = [count/10 for count in self.count[name]['data'] if count > 0]
+            highest_rate = max(rate_without_zero)
+            mean_rate = total / total_duration
+            d.append([name,
+                      str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
+                      total])
+        table['match']['data'] = d
+
         # HTTP return code
         d = []
         for name in sorted(self.names['http']):
@@ -296,6 +320,15 @@ class Tsung:
             })
         charts_data['transactions_rate']['data'] = lines_data
         charts_data['transactions_rate']['json'] = json.dumps(lines_data)
+
+        # Matching report
+        lines_data = self.one_chart_data(self.names['match'],
+            lambda _name: {
+                'timestamp': self.count[_name]['timestamp'],
+                'data': [x / 10 for x in self.count[_name]['data']]
+            })
+        charts_data['match_rate']['data'] = lines_data
+        charts_data['match_rate']['json'] = json.dumps(lines_data)
 
         # HTTP Code Response Rate
         lines_data = self.one_chart_data(self.names['http'],

@@ -49,7 +49,7 @@ tables = {
         'data': []
     },
     'main': {
-        'done': False,
+        'done': True,
         'title': 'Main Statistics',
         'header': header7,
         'data': []
@@ -109,6 +109,18 @@ charts = {
         'title': 'Users arrival/departure rate',
         'xheader': 'time (sec of running test)',
         'yheader': 'number of users/sec',
+        'data': []
+    },
+    'main': {
+        'title': 'Mean request and connection duration',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'Request duration (msec)',
+        'data': []
+    },
+    'main_rate': {
+        'title': 'Request and TCP/IP connection rate',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'Request rate (r/sec)',
         'data': []
     },
 }
@@ -204,9 +216,14 @@ class Tsung:
                     data[name] = d
 
                 # users record
-                elif name in ('users', 'users_count', 'finish_users_count', 'connected'):
+                elif name in self.names['users']:
                     # stats: users_count 1 1
                     d = DataCounter(*words)
+                    data[name] = d
+
+                # main statistics
+                elif name in self.names['main']:
+                    d = Data(words[0], *map(number, words[1:]))
                     data[name] = d
 
         self.data.append(data)
@@ -287,6 +304,25 @@ class Tsung:
                       str_sec(mean), total])
         table['transaction']['data'] = d
 
+        # main statistics (same as transactions)
+        d = []
+        for name in sorted(self.names['main']):
+            values_without_zero = [value for value, count in zip(self.mean[name]['data'], self.count[name]['data']) if count > 0]
+            # print(f'{name=} {values_without_zero=}')
+            highest_mean = max(values_without_zero)
+            lowest_mean = min(values_without_zero)
+            mean = sum(values_without_zero) / len(values_without_zero)
+
+            total = sum(self.count[name]['data'])
+            rates = [count/10 for count in self.count[name]['data']]
+            highest_rate = max(rates)
+            mean_rate = sum(rates) / len(rates)
+            d.append([name,
+                      str_sec(highest_mean), str_sec(lowest_mean),
+                      str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
+                      str_sec(mean), total])
+        table['main']['data'] = d
+
         # matching report (same as http table, except name)
         d = []
         for name in sorted(self.names['match']):
@@ -356,6 +392,7 @@ class Tsung:
         """Fill charts dictionary after parsing and return it."""
         # todo: fill charts data
         charts_data = charts.copy()
+
         # Mean transaction duration
         lines_data = self.one_chart_data(self.names['transaction'], lambda name: self.mean[name])
         charts_data['transactions_mean']['data'] = lines_data
@@ -369,6 +406,20 @@ class Tsung:
             })
         charts_data['transactions_rate']['data'] = lines_data
         charts_data['transactions_rate']['json'] = json.dumps(lines_data)
+
+        # Main duration
+        lines_data = self.one_chart_data(('connect', 'request'), lambda name: self.mean[name])
+        charts_data['main']['data'] = lines_data
+        charts_data['main']['json'] = json.dumps(lines_data)
+
+        # Main rate
+        lines_data = self.one_chart_data(('connect', 'request'),
+            lambda _name: {
+                'timestamp': self.count[_name]['timestamp'],
+                'data': [x / 10 for x in self.count[_name]['data']]
+            })
+        charts_data['main_rate']['data'] = lines_data
+        charts_data['main_rate']['json'] = json.dumps(lines_data)
 
         # Matching report
         lines_data = self.one_chart_data(self.names['match'],

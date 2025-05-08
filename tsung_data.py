@@ -24,6 +24,30 @@ tables = {
         'header': header7,
         'data': []
     },
+    'http': {
+        'done': True,
+        'title': 'HTTP return code',
+        'header': ['Code', 'Highest Rate', 'Mean Rate', 'Total number'],
+        'data': []
+    },
+    'match': {
+        'done': True,
+        'title': 'Match Statistics',
+        'header': ['Name', 'Highest Rate', 'Mean Rate', 'Total number'],
+        'data': []
+    },
+    'error': {
+        'done': True,
+        'title': 'Errors',
+        'header': ['Name', 'Highest Rate', 'Total number'],
+        'data': []
+    },
+    'users': {
+        'done': True,
+        'title': 'Counters Statistics',
+        'header': ['Name', 'Max'],
+        'data': []
+    },
     'main': {
         'done': False,
         'title': 'Main Statistics',
@@ -36,36 +60,12 @@ tables = {
         'header': ['Name', 'Highest Rate', 'Total'],
         'data': []
     },
-    'match': {
-        'done': True,
-        'title': 'Match Statistics',
-        'header': ['Name', 'Highest Rate', 'Mean Rate', 'Total number'],
-        'data': []
-    },
-    'users': {
-        'done': False,
-        'title': 'Counters Statistics',
-        'header': ['Name', 'Max'],
-        'data': []
-    },
-    'error': {
-        'done': True,
-        'title': 'Errors',
-        'header': ['Name', 'Highest Rate', 'Total number'],
-        'data': []
-    },
     'server': {
         'done': False,
         'title': 'Server monitoring',
         'header': ['Name', 'Highest 10sec mean', 'Lowest 10sec mean'],
         'data': []
     },
-    'http': {
-        'done': True,
-        'title': 'HTTP return code',
-        'header': ['Code', 'Highest Rate', 'Mean Rate', 'Total number'],
-        'data': []
-    }
 }
 
 charts = {
@@ -81,14 +81,14 @@ charts = {
         'yheader': 'transactions/sec',
         'data': []
     },
-    'match_rate': {
-        'title': 'Matching responses',
+    'http_rate': {
+        'title': 'HTTP code response rate',
         'xheader': 'time (sec of running test)',
         'yheader': 'number/sec',
         'data': []
     },
-    'http_rate': {
-        'title': 'HTTP code response rate',
+    'match_rate': {
+        'title': 'Matching responses',
         'xheader': 'time (sec of running test)',
         'yheader': 'number/sec',
         'data': []
@@ -97,6 +97,18 @@ charts = {
         'title': 'Errors (rate)',
         'xheader': 'time (sec of running test)',
         'yheader': 'errors/sec',
+        'data': []
+    },
+    'users': {
+        'title': 'Simultaneous Users and opened TCP/IP connections',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'value',
+        'data': []
+    },
+    'users_arrival': {
+        'title': 'Users arrival/departure rate',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'number of users/sec',
         'data': []
     },
 }
@@ -188,6 +200,12 @@ class Tsung:
                 # error records
                 elif 'error' in name:
                     # stats: error_json_unparsable 0 1
+                    d = DataCounter(*words)
+                    data[name] = d
+
+                # users record
+                elif name in ('users', 'users_count', 'finish_users_count', 'connected'):
+                    # stats: users_count 1 1
                     d = DataCounter(*words)
                     data[name] = d
 
@@ -303,6 +321,15 @@ class Tsung:
                       str_number(highest_rate, 2, '/sec'),
                       total])
         table['error']['data'] = d
+
+        # Users
+        d = []
+        for name in sorted(self.names['users']):
+            max_value = max(self.count[name]['data'])
+            d.append([name,
+                      max_value])
+        table['users']['data'] = d
+
         return table
 
     def one_chart_data(self, names: Sequence[str], get_data_by_name) -> list[dict]:
@@ -361,7 +388,7 @@ class Tsung:
         charts_data['http_rate']['data'] = lines_data
         charts_data['http_rate']['json'] = json.dumps(lines_data)
 
-        # Matching report
+        # Error rate
         lines_data = self.one_chart_data(self.names['error'],
             lambda _name: {
                 'timestamp': self.count[_name]['timestamp'],
@@ -369,6 +396,24 @@ class Tsung:
             })
         charts_data['error_rate']['data'] = lines_data
         charts_data['error_rate']['json'] = json.dumps(lines_data)
+
+        # Simultaneous Users
+        lines_data = self.one_chart_data(('users', 'connected'),
+            lambda _name: {
+                'timestamp': self.count[_name]['timestamp'],
+                'data': [x for x in self.count[_name]['data']]
+            })
+        charts_data['users']['data'] = lines_data
+        charts_data['users']['json'] = json.dumps(lines_data)
+
+        # User arrival/depature rate
+        lines_data = self.one_chart_data(('users_count', 'finish_users_count'),
+            lambda _name: {
+                'timestamp': self.count[_name]['timestamp'],
+                'data': [x / 10 for x in self.count[_name]['data']]
+            })
+        charts_data['users_arrival']['data'] = lines_data
+        charts_data['users_arrival']['json'] = json.dumps(lines_data)
 
         return charts_data
 

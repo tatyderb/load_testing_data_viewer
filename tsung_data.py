@@ -37,7 +37,7 @@ tables = {
         'data': []
     },
     'match': {
-        'done': False,
+        'done': True,
         'title': 'Match Statistics',
         'header': ['Name', 'Highest Rate', 'Mean Rate', 'Total number'],
         'data': []
@@ -48,8 +48,8 @@ tables = {
         'header': ['Name', 'Max'],
         'data': []
     },
-    'errors': {
-        'done': False,
+    'error': {
+        'done': True,
         'title': 'Errors',
         'header': ['Name', 'Highest Rate', 'Total number'],
         'data': []
@@ -61,7 +61,7 @@ tables = {
         'data': []
     },
     'http': {
-        'done': False,
+        'done': True,
         'title': 'HTTP return code',
         'header': ['Code', 'Highest Rate', 'Mean Rate', 'Total number'],
         'data': []
@@ -91,6 +91,12 @@ charts = {
         'title': 'HTTP code response rate',
         'xheader': 'time (sec of running test)',
         'yheader': 'number/sec',
+        'data': []
+    },
+    'error_rate': {
+        'title': 'Errors (rate)',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'errors/sec',
         'data': []
     },
 }
@@ -176,6 +182,12 @@ class Tsung:
                 # match records
                 elif 'match' in name:
                     # stats: nomatch 362 469
+                    d = DataCounter(*words)
+                    data[name] = d
+
+                # error records
+                elif 'error' in name:
+                    # stats: error_json_unparsable 0 1
                     d = DataCounter(*words)
                     data[name] = d
 
@@ -281,6 +293,16 @@ class Tsung:
                       total])
         table['http']['data'] = d
 
+        # Errors
+        d = []
+        for name in sorted(self.names['error']):
+            total = sum(self.count[name]['data'])
+            rate_without_zero = [count/10 for count in self.count[name]['data'] if count > 0]
+            highest_rate = max(rate_without_zero)
+            d.append([name,
+                      str_number(highest_rate, 2, '/sec'),
+                      total])
+        table['error']['data'] = d
         return table
 
     def one_chart_data(self, names: Sequence[str], get_data_by_name) -> list[dict]:
@@ -339,6 +361,14 @@ class Tsung:
         charts_data['http_rate']['data'] = lines_data
         charts_data['http_rate']['json'] = json.dumps(lines_data)
 
+        # Matching report
+        lines_data = self.one_chart_data(self.names['error'],
+            lambda _name: {
+                'timestamp': self.count[_name]['timestamp'],
+                'data': [x / 10 for x in self.count[_name]['data']]
+            })
+        charts_data['error_rate']['data'] = lines_data
+        charts_data['error_rate']['json'] = json.dumps(lines_data)
 
         return charts_data
 

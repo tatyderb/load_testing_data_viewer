@@ -61,7 +61,7 @@ tables = {
         'data': []
     },
     'server': {
-        'done': False,
+        'done': True,
         'title': 'Server monitoring',
         'header': ['Name', 'Highest 10sec mean', 'Lowest 10sec mean'],
         'data': []
@@ -123,6 +123,24 @@ charts = {
         'yheader': 'Request rate (r/sec)',
         'data': []
     },
+    'cpu': {
+        'title': 'CPU% (mean)',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'cpu',
+        'data': []
+    },
+    'load': {
+        'title': 'CPU load (mean)',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'load',
+        'data': []
+    },
+    'freemem': {
+        'title': 'Free memory (mean)',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'freemem',
+        'data': []
+    },
 }
 
 Data = namedtuple('Data', 'name count_10sec mean_10sec stddev_10sec max min mean count')
@@ -155,7 +173,10 @@ class Tsung:
             'match': set(),
             'http': set(),
             'error': set(),
-            'server': ('load', 'cpu', 'freemem')
+            # server sets: cpu, load, freemem
+            'cpu': set(),
+            'load': set(),
+            'freemem': set(),
         }
         # { name1: [mean_10sec_vales], name2: [mean_10sec_vales], ... } for each name
         self.mean = {}
@@ -223,7 +244,14 @@ class Tsung:
 
                 # main statistics
                 elif name in self.names['main']:
-                    d = Data(words[0], *map(number, words[1:]))
+                    d = Data(name, *map(number, words[1:]))
+                    data[name] = d
+
+                # server statistics
+                elif name.startswith('{'):
+                    # stats: {load,"tsung_controller@f6f41ca75a60"} 1 0.26953125 0.0 0.3203125 0.26953125 0.3203125 1
+                    name = name[1:-2].replace(',"', '@')
+                    d = Data(name, *map(number, words[1:]))
                     data[name] = d
 
         self.data.append(data)
@@ -276,6 +304,12 @@ class Tsung:
             self.names['error'].add(name)
         elif 'match' in name:
             self.names['match'].add(name)
+        elif name.startswith('cpu') :
+            self.names['cpu'].add(name)
+        elif name.startswith('load') :
+            self.names['load'].add(name)
+        elif name.startswith('freemem') :
+            self.names['freemem'].add(name)
 
     def tables(self):
         """Fill tables dictionary after parsing and return it."""
@@ -365,6 +399,22 @@ class Tsung:
             d.append([name,
                       max_value])
         table['users']['data'] = d
+
+        # Server (aggregate tabel for cpu, load, freemem)
+        d = []
+        for name in sorted(self.names['cpu']):
+            max_value = max(self.mean[name]['data'])
+            min_value = min(self.mean[name]['data'])
+            d.append([name, str_number(max_value, accuracy=2, unit='%'), str_number(min_value, accuracy=2, unit='%')])
+        for name in sorted(self.names['load']):
+            max_value = max(self.mean[name]['data'])
+            min_value = min(self.mean[name]['data'])
+            d.append([name, str_number(max_value, accuracy=2), str_number(min_value, accuracy=2)])
+        for name in sorted(self.names['freemem']):
+            max_value = max(self.mean[name]['data'])
+            min_value = min(self.mean[name]['data'])
+            d.append([name, str_number(max_value, accuracy=0, unit=' MB'), str_number(min_value, accuracy=0, unit=' MB')])
+        table['server']['data'] = d
 
         return table
 
@@ -465,6 +515,25 @@ class Tsung:
             })
         charts_data['users_arrival']['data'] = lines_data
         charts_data['users_arrival']['json'] = json.dumps(lines_data)
+
+        # Mean cpu%
+        lines_data = self.one_chart_data(self.names['cpu'], lambda name: self.mean[name])
+        charts_data['cpu']['data'] = lines_data
+        charts_data['cpu']['json'] = json.dumps(lines_data)
+        # print('=========================')
+        # print(f'CPU: {self.names['cpu']=}')
+        # print(lines_data)
+
+        # Mean load
+        lines_data = self.one_chart_data(self.names['load'], lambda name: self.mean[name])
+        charts_data['load']['data'] = lines_data
+        charts_data['load']['json'] = json.dumps(lines_data)
+
+        # Mean freemem
+        lines_data = self.one_chart_data(self.names['freemem'], lambda name: self.mean[name])
+        charts_data['freemem']['data'] = lines_data
+        charts_data['freemem']['json'] = json.dumps(lines_data)
+
 
         return charts_data
 

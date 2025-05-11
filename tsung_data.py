@@ -221,7 +221,7 @@ class Tsung:
                     continue
 
                 words = line.split()
-                print(f'{words=}')
+                # print(f'{words=}')
                 name = words[0]
 
                 # http return codes
@@ -302,7 +302,7 @@ class Tsung:
         # print(f'mean: {self.mean}')
         print(f'mean keys: {self.mean.keys()}')
         print(f'count keys: {self.count.keys()}')
-        print(f'count: {self.count}')
+        # print(f'count: {self.count}')
 
     def add_name_by_category(self, name: str):
         """Add name to self.names."""
@@ -327,123 +327,134 @@ class Tsung:
         """Duration in sec from timestamp till self.data[-1]['timestamp']"""
         return int(self.data[-1]['timestamp']) - int(timestamp)
 
-    def tables(self):
+    def tables(self, table_list: list[str]):
         """Fill tables dictionary after parsing and return it."""
-        table = tables.copy()
-        # todo: fill tables data
+        table = {key: value for key, value in tables.items() if key in table_list}
 
         # Total test duration in sec
         total_duration = self.duration(self.start_timestamp)
 
-        # transactions
-        d = []
-        for name in sorted(self.names['transaction']):
-            values_without_zero = [value for value, count in zip(self.mean[name]['data'], self.count[name]['data']) if count > 0]
-            # print(f'{name=} {values_without_zero=}')
-            highest_mean = max(values_without_zero)
-            lowest_mean = min(values_without_zero)
-            mean = sum(values_without_zero) / len(values_without_zero)
+        for table_name in table_list:
+            match table_name:
+                case 'transaction':
+                    d = []
+                    for name in sorted(self.names['transaction']):
+                        values_without_zero = [value for value, count in zip(self.mean[name]['data'], self.count[name]['data']) if count > 0]
+                        # print(f'{name=} {values_without_zero=}')
+                        highest_mean = max(values_without_zero)
+                        lowest_mean = min(values_without_zero)
+                        mean = sum(values_without_zero) / len(values_without_zero)
 
-            total = sum(self.count[name]['data'])
-            rates = [count/10 for count in self.count[name]['data']]
-            highest_rate = max(rates)
-            mean_rate = sum(rates) / len(rates)
-            d.append([name,
-                      str_sec(highest_mean), str_sec(lowest_mean),
-                      str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
-                      str_sec(mean), total])
-        table['transaction']['data'] = d
+                        total = sum(self.count[name]['data'])
+                        rates = [count/10 for count in self.count[name]['data']]
+                        highest_rate = max(rates)
+                        mean_rate = sum(rates) / len(rates)
+                        d.append([name,
+                                  str_sec(highest_mean), str_sec(lowest_mean),
+                                  str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
+                                  str_sec(mean), total])
+                    table['transaction']['data'] = d
 
-        # main statistics (same as transactions)
-        d = []
-        for name in sorted(self.names['main']):
-            values_without_zero = [value for value, count in zip(self.mean[name]['data'], self.count[name]['data']) if count > 0]
-            # print(f'{name=} {values_without_zero=}')
-            highest_mean = max(values_without_zero)
-            lowest_mean = min(values_without_zero)
-            mean = sum(values_without_zero) / len(values_without_zero)
+                case 'main':
+                    # main statistics (same as transactions)
+                    d = []
+                    for name in sorted(self.names['main']):
+                        values_without_zero = [value for value, count in zip(self.mean[name]['data'], self.count[name]['data']) if count > 0]
+                        # print(f'{name=} {values_without_zero=}')
+                        highest_mean = max(values_without_zero)
+                        lowest_mean = min(values_without_zero)
+                        mean = sum(values_without_zero) / len(values_without_zero)
 
-            total = sum(self.count[name]['data'])
-            rates = [count/10 for count in self.count[name]['data']]
-            highest_rate = max(rates)
-            mean_rate = sum(rates) / len(rates)
-            d.append([name,
-                      str_sec(highest_mean), str_sec(lowest_mean),
-                      str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
-                      str_sec(mean), total])
-        table['main']['data'] = d
+                        total = sum(self.count[name]['data'])
+                        rates = [count/10 for count in self.count[name]['data']]
+                        highest_rate = max(rates)
+                        mean_rate = sum(rates) / len(rates)
+                        d.append([name,
+                                  str_sec(highest_mean), str_sec(lowest_mean),
+                                  str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
+                                  str_sec(mean), total])
+                    table['main']['data'] = d
 
-        # matching report (same as http table, except name)
-        d = []
-        for name in sorted(self.names['match']):
-            total = sum(self.count[name]['data'])
-            rate_without_zero = [count/10 for count in self.count[name]['data'] if count > 0]
-            highest_rate = max(rate_without_zero)
-            mean_rate = total / total_duration
-            d.append([name,
-                      str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
-                      total])
-        table['match']['data'] = d
+                case 'match':
+                    # matching report (same as http table, except name)
+                    d = []
+                    for name in sorted(self.names['match']):
+                        total = sum(self.count[name]['data'])
+                        rate_without_zero = [count/10 for count in self.count[name]['data'] if count > 0]
+                        highest_rate = max(rate_without_zero)
+                        mean_rate = total / total_duration
+                        d.append([name,
+                                  str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
+                                  total])
+                    table['match']['data'] = d
 
-        # HTTP return code
-        d = []
-        for name in sorted(self.names['http']):
-            total = sum(self.count[name]['data'])
-            rate_without_zero = [count/10 for count in self.count[name]['data'] if count > 0]
-            highest_rate = max(rate_without_zero)
-            # _total_duration = len(rate_without_zero) * 10
-            _total_duration = self.duration(self.count[name]['timestamp'])
-            mean_rate = total / _total_duration
-            d.append([name,
-                      str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
-                      total])
-        table['http']['data'] = d
+                case 'http':
+                    # HTTP return code
+                    d = []
+                    for name in sorted(self.names['http']):
+                        total = sum(self.count[name]['data'])
+                        rate_without_zero = [count/10 for count in self.count[name]['data'] if count > 0]
+                        highest_rate = max(rate_without_zero)
+                        # _total_duration = len(rate_without_zero) * 10
+                        _total_duration = self.duration(self.count[name]['timestamp'])
+                        mean_rate = total / _total_duration
+                        d.append([name,
+                                  str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
+                                  total])
+                    table['http']['data'] = d
 
-        # Errors
-        d = []
-        for name in sorted(self.names['error']):
-            total = sum(self.count[name]['data'])
-            rate_without_zero = [count/10 for count in self.count[name]['data'] if count > 0]
-            highest_rate = max(rate_without_zero)
-            d.append([name,
-                      str_number(highest_rate, 2, '/sec'),
-                      total])
-        table['error']['data'] = d
+                case 'error':
+                    # Errors
+                    d = []
+                    for name in sorted(self.names['error']):
+                        total = sum(self.count[name]['data'])
+                        rate_without_zero = [count/10 for count in self.count[name]['data'] if count > 0]
+                        highest_rate = max(rate_without_zero)
+                        d.append([name,
+                                  str_number(highest_rate, 2, '/sec'),
+                                  total])
+                    table['error']['data'] = d
 
-        # Network (same as Errors)
-        d = []
-        for name in sorted(self.names['network']):
-            total = sum(self.count[name]['data'])
-            rate_without_zero = [count/10 for count in self.count[name]['data'] if count > 0]
-            highest_rate = max(rate_without_zero)
-            d.append([name,
-                      str_bits_per_sec(highest_rate),
-                      str_bytes(total)])
-        table['network']['data'] = d
+                case 'network':
+                    # Network (same as Errors)
+                    d = []
+                    for name in sorted(self.names['network']):
+                        total = sum(self.count[name]['data'])
+                        rate_without_zero = [count/10 for count in self.count[name]['data'] if count > 0]
+                        highest_rate = max(rate_without_zero)
+                        d.append([name,
+                                  str_bits_per_sec(highest_rate),
+                                  str_bytes(total)])
+                    table['network']['data'] = d
 
-        # Users
-        d = []
-        for name in sorted(self.names['users']):
-            max_value = max(self.count[name]['data'])
-            d.append([name,
-                      max_value])
-        table['users']['data'] = d
+                case 'users':
+                    # Users
+                    d = []
+                    for name in sorted(self.names['users']):
+                        max_value = max(self.count[name]['data'])
+                        d.append([name,
+                                  max_value])
+                    table['users']['data'] = d
 
-        # Server (aggregate tabel for cpu, load, freemem)
-        d = []
-        for name in sorted(self.names['cpu']):
-            max_value = max(self.mean[name]['data'])
-            min_value = min(self.mean[name]['data'])
-            d.append([name, str_number(max_value, accuracy=2, unit='%'), str_number(min_value, accuracy=2, unit='%')])
-        for name in sorted(self.names['load']):
-            max_value = max(self.mean[name]['data'])
-            min_value = min(self.mean[name]['data'])
-            d.append([name, str_number(max_value, accuracy=2), str_number(min_value, accuracy=2)])
-        for name in sorted(self.names['freemem']):
-            max_value = max(self.mean[name]['data'])
-            min_value = min(self.mean[name]['data'])
-            d.append([name, str_number(max_value, accuracy=0, unit=' MB'), str_number(min_value, accuracy=0, unit=' MB')])
-        table['server']['data'] = d
+                case 'server':
+                    # Server (aggregate tabel for cpu, load, freemem)
+                    d = []
+                    for name in sorted(self.names['cpu']):
+                        max_value = max(self.mean[name]['data'])
+                        min_value = min(self.mean[name]['data'])
+                        d.append([name, str_number(max_value, accuracy=2, unit='%'), str_number(min_value, accuracy=2, unit='%')])
+                    for name in sorted(self.names['load']):
+                        max_value = max(self.mean[name]['data'])
+                        min_value = min(self.mean[name]['data'])
+                        d.append([name, str_number(max_value, accuracy=2), str_number(min_value, accuracy=2)])
+                    for name in sorted(self.names['freemem']):
+                        max_value = max(self.mean[name]['data'])
+                        min_value = min(self.mean[name]['data'])
+                        d.append([name, str_number(max_value, accuracy=0, unit=' MB'), str_number(min_value, accuracy=0, unit=' MB')])
+                    table['server']['data'] = d
+
+                case _:
+                    raise ValueError(f'Unknown table "{table_name}"')
 
         return table
 
@@ -467,122 +478,100 @@ class Tsung:
 
         return lines_data
 
-    def charts(self):
+    def charts(self, chart_list: list[str]):
         """Fill charts dictionary after parsing and return it."""
-        # todo: fill charts data
-        charts_data = charts.copy()
+        charts_data = {key: value for key, value in charts.items() if key in chart_list}
 
-        # Mean transaction duration
-        lines_data = self.one_chart_data(self.names['transaction'], lambda name: self.mean[name])
-        charts_data['transactions_mean']['data'] = lines_data
-        charts_data['transactions_mean']['json'] = json.dumps(lines_data)
+        for chart_name in chart_list:
+            lines_data = None
+            match chart_name:
+                case 'transactions_mean':
+                    # Mean transaction duration
+                    lines_data = self.one_chart_data(self.names['transaction'], lambda name: self.mean[name])
 
-        # Transaction rate
-        lines_data = self.one_chart_data(self.names['transaction'],
-            lambda _name: {
-                'timestamp': self.count[_name]['timestamp'],
-                'data': [x / 10 for x in self.count[_name]['data']]
-            })
-        charts_data['transactions_rate']['data'] = lines_data
-        charts_data['transactions_rate']['json'] = json.dumps(lines_data)
+                case 'transactions_rate':
+                    # Transaction rate
+                    lines_data = self.one_chart_data(self.names['transaction'],
+                         lambda _name: {
+                             'timestamp': self.count[_name]['timestamp'],
+                             'data': [x / 10 for x in self.count[_name]['data']]
+                         })
 
-        # Main duration
-        lines_data = self.one_chart_data(('connect', 'request'), lambda name: self.mean[name])
-        charts_data['main']['data'] = lines_data
-        charts_data['main']['json'] = json.dumps(lines_data)
+                case 'main':
+                    # Main duration
+                     lines_data = self.one_chart_data(('connect', 'request'), lambda name: self.mean[name])
 
-        # Main rate
-        lines_data = self.one_chart_data(('connect', 'request'),
-            lambda _name: {
-                'timestamp': self.count[_name]['timestamp'],
-                'data': [x / 10 for x in self.count[_name]['data']]
-            })
-        charts_data['main_rate']['data'] = lines_data
-        charts_data['main_rate']['json'] = json.dumps(lines_data)
+                case 'main_rate':
+                    # Main rate
+                    lines_data = self.one_chart_data(('connect', 'request'),
+                         lambda _name: {
+                             'timestamp': self.count[_name]['timestamp'],
+                             'data': [x / 10 for x in self.count[_name]['data']]
+                         })
 
-        # Network rate
-        lines_data = self.one_chart_data(self.names['network'],
-            lambda _name: {
-                'timestamp': self.count[_name]['timestamp'],
-                # byte -> bit (*8) -> Kbit (/1024) -> per second (/10)
-                'data': [x * 8 / 10 / 1024 for x in self.count[_name]['data']]
-            })
-        charts_data['network']['data'] = lines_data
-        charts_data['network']['json'] = json.dumps(lines_data)
+                case 'network':
+                    # Network rate
+                    lines_data = self.one_chart_data(self.names['network'],
+                         lambda _name: {
+                             'timestamp': self.count[_name]['timestamp'],
+                             # byte -> bit (*8) -> Kbit (/1024) -> per second (/10)
+                             'data': [x * 8 / 10 / 1024 for x in self.count[_name]['data']]
+                         })
 
-        # Matching report
-        lines_data = self.one_chart_data(self.names['match'],
-            lambda _name: {
-                'timestamp': self.count[_name]['timestamp'],
-                'data': [x / 10 for x in self.count[_name]['data']]
-            })
-        charts_data['match_rate']['data'] = lines_data
-        charts_data['match_rate']['json'] = json.dumps(lines_data)
+                case 'match_rate':
+                    # Matching report
+                    lines_data = self.one_chart_data(self.names['match'],
+                         lambda _name: {
+                             'timestamp': self.count[_name]['timestamp'],
+                             'data': [x / 10 for x in self.count[_name]['data']]
+                         })
 
-        # HTTP Code Response Rate
-        lines_data = self.one_chart_data(self.names['http'],
-            lambda _name: {
-                'timestamp': self.count[_name]['timestamp'],
-                'data': [x / 10 for x in self.count[_name]['data']]
-            })
-        charts_data['http_rate']['data'] = lines_data
-        charts_data['http_rate']['json'] = json.dumps(lines_data)
+                case 'http_rate':
+                    # HTTP Code Response Rate
+                    lines_data = self.one_chart_data(self.names['http'],
+                         lambda _name: {
+                             'timestamp': self.count[_name]['timestamp'],
+                             'data': [x / 10 for x in self.count[_name]['data']]
+                         })
 
-        # Error rate
-        lines_data = self.one_chart_data(self.names['error'],
-            lambda _name: {
-                'timestamp': self.count[_name]['timestamp'],
-                'data': [x / 10 for x in self.count[_name]['data']]
-            })
-        charts_data['error_rate']['data'] = lines_data
-        charts_data['error_rate']['json'] = json.dumps(lines_data)
+                case 'error_rate':
+                    # Error rate
+                    lines_data = self.one_chart_data(self.names['error'],
+                         lambda _name: {
+                             'timestamp': self.count[_name]['timestamp'],
+                             'data': [x / 10 for x in self.count[_name]['data']]
+                         })
 
-        # Simultaneous Users
-        lines_data = self.one_chart_data(('users', 'connected'),
-            lambda _name: {
-                'timestamp': self.count[_name]['timestamp'],
-                'data': [x for x in self.count[_name]['data']]
-            })
-        charts_data['users']['data'] = lines_data
-        charts_data['users']['json'] = json.dumps(lines_data)
+                case 'users':
+                    # Simultaneous Users
+                    lines_data = self.one_chart_data(('users', 'connected'),
+                         lambda _name: {
+                             'timestamp': self.count[_name]['timestamp'],
+                             'data': [x for x in self.count[_name]['data']]
+                         })
 
-        # User arrival/depature rate
-        lines_data = self.one_chart_data(('users_count', 'finish_users_count'),
-            lambda _name: {
-                'timestamp': self.count[_name]['timestamp'],
-                'data': [x / 10 for x in self.count[_name]['data']]
-            })
-        charts_data['users_arrival']['data'] = lines_data
-        charts_data['users_arrival']['json'] = json.dumps(lines_data)
+                case 'users_arrival':
+                    # User arrival/depature rate
+                    lines_data = self.one_chart_data(('users_count', 'finish_users_count'),
+                         lambda _name: {
+                             'timestamp': self.count[_name]['timestamp'],
+                             'data': [x / 10 for x in self.count[_name]['data']]
+                         })
+                    print(f'users_arrival len={len(lines_data)}')
 
-        # Mean cpu%
-        lines_data = self.one_chart_data(self.names['cpu'], lambda name: self.mean[name])
-        charts_data['cpu']['data'] = lines_data
-        charts_data['cpu']['json'] = json.dumps(lines_data)
-        # print('=========================')
-        # print(f'CPU: {self.names['cpu']=}')
-        # print(lines_data)
+                case 'cpu':
+                    # Mean cpu%
+                    lines_data = self.one_chart_data(self.names['cpu'], lambda name: self.mean[name])
 
-        # Mean load
-        lines_data = self.one_chart_data(self.names['load'], lambda name: self.mean[name])
-        charts_data['load']['data'] = lines_data
-        charts_data['load']['json'] = json.dumps(lines_data)
+                case 'load':
+                    # Mean load
+                    lines_data = self.one_chart_data(self.names['load'], lambda name: self.mean[name])
 
-        # Mean freemem
-        lines_data = self.one_chart_data(self.names['freemem'], lambda name: self.mean[name])
-        charts_data['freemem']['data'] = lines_data
-        charts_data['freemem']['json'] = json.dumps(lines_data)
+                case 'freemem':
+                    # Mean freemem
+                    lines_data = self.one_chart_data(self.names['freemem'], lambda name: self.mean[name])
 
+            charts_data[chart_name]['data'] = lines_data
+            charts_data[chart_name]['json'] = json.dumps(lines_data)
 
         return charts_data
-
-    def table_transactions(self) -> list[tuple]:
-        """Return Transactions table data as list of tuples
-        'Name', 'Highest 10sec mean', 'Lowest 10sec mean', 'Highest Rate', 'Mean Rate', 'Mean', 'Count'
-        """
-        start_timestamp = int(self.data[0]['timestamp'])
-        for d in self.data:
-            timestamp = d['timestamp']
-
-
-

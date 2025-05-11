@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
 
-from utils import str_number, str_sec, number
+from utils import str_number, str_sec, number, str_bytes, str_bits_per_sec
 
 header7 = ['Name', 'Highest 10sec mean', 'Lowest 10sec mean', 'Highest Rate', 'Mean Rate', 'Mean', 'Count']
 tables = {
@@ -55,7 +55,7 @@ tables = {
         'data': []
     },
     'network': {
-        'done': False,
+        'done': True,
         'title': 'Network Throughput',
         'header': ['Name', 'Highest Rate', 'Total'],
         'data': []
@@ -139,6 +139,12 @@ charts = {
         'title': 'Free memory (mean)',
         'xheader': 'time (sec of running test)',
         'yheader': 'freemem',
+        'data': []
+    },
+    'network': {
+        'title': 'Network throughput',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'Kbits/sec',
         'data': []
     },
 }
@@ -242,6 +248,12 @@ class Tsung:
                     d = DataCounter(*words)
                     data[name] = d
 
+                # network record
+                elif name in self.names['network']:
+                    # stats: users_count 1 1
+                    d = DataCounter(*words)
+                    data[name] = d
+
                 # main statistics
                 elif name in self.names['main']:
                     d = Data(name, *map(number, words[1:]))
@@ -311,13 +323,17 @@ class Tsung:
         elif name.startswith('freemem') :
             self.names['freemem'].add(name)
 
+    def duration(self, timestamp):
+        """Duration in sec from timestamp till self.data[-1]['timestamp']"""
+        return int(self.data[-1]['timestamp']) - int(timestamp)
+
     def tables(self):
         """Fill tables dictionary after parsing and return it."""
         table = tables.copy()
         # todo: fill tables data
 
         # Total test duration in sec
-        total_duration = int(self.data[-1]['timestamp']) - self.start_timestamp
+        total_duration = self.duration(self.start_timestamp)
 
         # transactions
         d = []
@@ -375,7 +391,9 @@ class Tsung:
             total = sum(self.count[name]['data'])
             rate_without_zero = [count/10 for count in self.count[name]['data'] if count > 0]
             highest_rate = max(rate_without_zero)
-            mean_rate = total / total_duration
+            # _total_duration = len(rate_without_zero) * 10
+            _total_duration = self.duration(self.count[name]['timestamp'])
+            mean_rate = total / _total_duration
             d.append([name,
                       str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
                       total])
@@ -391,6 +409,17 @@ class Tsung:
                       str_number(highest_rate, 2, '/sec'),
                       total])
         table['error']['data'] = d
+
+        # Network (same as Errors)
+        d = []
+        for name in sorted(self.names['network']):
+            total = sum(self.count[name]['data'])
+            rate_without_zero = [count/10 for count in self.count[name]['data'] if count > 0]
+            highest_rate = max(rate_without_zero)
+            d.append([name,
+                      str_bits_per_sec(highest_rate),
+                      str_bytes(total)])
+        table['network']['data'] = d
 
         # Users
         d = []
@@ -470,6 +499,16 @@ class Tsung:
             })
         charts_data['main_rate']['data'] = lines_data
         charts_data['main_rate']['json'] = json.dumps(lines_data)
+
+        # Network rate
+        lines_data = self.one_chart_data(self.names['network'],
+            lambda _name: {
+                'timestamp': self.count[_name]['timestamp'],
+                # byte -> bit (*8) -> Kbit (/1024) -> per second (/10)
+                'data': [x * 8 / 10 / 1024 for x in self.count[_name]['data']]
+            })
+        charts_data['network']['data'] = lines_data
+        charts_data['network']['json'] = json.dumps(lines_data)
 
         # Matching report
         lines_data = self.one_chart_data(self.names['match'],

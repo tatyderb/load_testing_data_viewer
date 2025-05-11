@@ -1,3 +1,4 @@
+import configparser
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
@@ -19,7 +20,12 @@ def create_report(report_date: str, tables: dict, charts: dict):
 
 if __name__ == "__main__":
     dirname = './log_examples/tsung_20250505-1039'
+    config = configparser.RawConfigParser(allow_no_value=True)
+    config.read('report.ini')
+    # print(config)
+    # print(*config['tables'])
+    # print(*config['charts'])
     tsung = Tsung()
     tsung.parse(dirname)
     tsung.process()
-    create_report(dirname[-13:], tsung.tables(), tsung.charts())
+    create_report(dirname[-13:], tsung.tables(list(config['tables'])), tsung.charts(list(config['charts'])))

@@ -160,7 +160,6 @@ class Tsung:
     PREFIX_ERROR = 'error_'
     PREFIX_TRANSACTION = 'tr_'
     # no info about these transactions in report, please ignore:
-    IGNORE_TRANSACTIONS = {'tr_rand_name', 'tr_set_var', 'tr_readfile', 'tr_rand_name', 'tr_get_host_name'}
 
     def __init__(self):
         self.start_timestamp: int = 0    # int(self.data[0]['timestamp']) - начало теста
@@ -269,15 +268,16 @@ class Tsung:
         self.data.append(data)
         # print(json.dumps(self.data, indent=4))
 
-    def process(self):
+    def process(self, ignore_transactions: list[str] | None = None):
         """Calculate mean and rate lists."""
+        ignore_transactions = ignore_transactions or []
         
         # Collect all names by categories
         for block in self.data:
             for name in block:
                 self.add_name_by_category(name)
         # some transactions should be ignored
-        self.names['transaction'] -= self.IGNORE_TRANSACTIONS
+        self.names['transaction'] -= ignore_transactions
 
         self.start_timestamp = int(self.data[0]['timestamp'])
         all_names = [name for category, names in self.names.items() for name in names]

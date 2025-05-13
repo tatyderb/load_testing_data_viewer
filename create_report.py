@@ -32,5 +32,5 @@ if __name__ == "__main__":
 
     tsung = Tsung()
     tsung.parse(log_dirname)
-    tsung.process()
+    tsung.process(ignore_transactions=set(config['tr_ignore']))
     create_report(log_dirname, log_datetime, tsung.tables(list(config['tables'])), tsung.charts(list(config['charts'])))

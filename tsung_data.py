@@ -1,17 +1,120 @@
 """
 Read TSUNG tsung.log file, convert to dict with data.
-[
+
+1. Tsung.parse - convert tsung.log file to list of dictionary.
+tsung.log
+stats: users_count 1 1
+stats: finish_users_count 0 0
+stats: request 11 215.35790909090912 233.65995448726713 825.156 56.882 0 0
+stats: page 4 559.8164999999999 175.03725592641695 825.156 385.624 0 0
+stats: 200 11 11
+stats: connect 2 387.331 268.39300000000003 655.724 118.938 0 0
+stats: tr_rand_name 3 0.35333333333333333 0.10977654070378101 0.481 0.213 0 0
+stats: nomatch 15 15
+stats: tr_get_host_name 1 0.211 0 0.211 0.211 0 0
+stats: size_rcv 18823 18823
+stats: tr_profile 1 92.286 0 92.286 92.286 0 0
+stats: size_sent 14985 14985
+stats: tr_cb_balance 2 78.20349999999999 0.6774999999999984 78.881 77.526 0 0
+stats: connected 1 1
+stats: tr_deposit 2 210.4145 94.92249999999999 305.337 115.492 0 0
+stats: tr_cb_bet 1 128.603 0 128.603 128.603 0 0
+stats: tr_cb_liveness 2 57.5655 0.23550000000000182 57.801 57.33 0 0
+stats: tr_set_var 1 1.319 0 1.319 1.319 0 0
+stats: tr_game_init_by_alias_100hp 1 516.781 0 516.781 516.781 0 0
+stats: tr_registration 1 853.515 0 853.515 853.515 0 0
+stats: tr_cb_win 1 120.871 0 120.871 120.871 0 0
+
+Counter data convert to CountData
+name count_10sec count_total
+Other data (transactions, system cpu/memory etc) have format
+name count_10sec mean_10sec stddev_10sec max min mean count
+self.data = [
   {
     'timestamp': 1746469501,
     "tr_registration": Data("tr_registration", "1", "853.515", "0", "853.515", "853.515", "0", "0"),
     "match": CountData("match", "3", "15"),
   }
 ]
+
+2. Tsung.process
+    * ignore some transaction, listed in config file (set variables, use random etc)
+    * For all dict in self.data
+self.count = {
+    'tr_registration': {'timestamp': 1746469501, 'data': [CountData.count_10sec or Data.count_10sec list]},
+    'match': {'timestamp': 1746469501, 'data': [0, 0, 3, 4, 1, 0, 2]},
+}
+self.mean = {
+    'tr_registration': {'timestamp': 1746469501, 'data': [Data.mean_10sec list]},
+}
+
+3. Create table data.
+For each table fill data in format:
+header7 = ['Name', 'Highest 10sec mean', 'Lowest 10sec mean', 'Highest Rate', 'Mean Rate', 'Mean', 'Count']
+tables = {
+    'transaction': {
+        'done': True,
+        'title': 'Transactions Statistics',
+        'header': header7,
+        'data': []
+    },
+    'match': {
+        'done': True,
+        'title': 'Match Statistics',
+        'header': ['Name', 'Highest Rate', 'Mean Rate', 'Total number'],
+        'data': []
+    },
+    ...
+}
+For each key (table name) in this dict fill data:
+table['transaction']['data'] = [[name,
+                                  str_sec(highest_mean), str_sec(lowest_mean),
+                                  str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
+                                  str_sec(mean), total],
+                                  ...]
+table['match']['data'] = [[name,
+                                  str_number(highest_rate, 2, '/sec'), str_number(mean_rate, 2, '/sec'),
+                                  total],
+                                  ...]
+The table dict will pass to create_report function.
+
+4. Create chart data
+charts = {
+    'transactions_mean': {
+        'title': 'Mean transaction duration',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'transaction duration (msec)',
+        'data': []
+    },
+    'transactions_rate': {
+        'title': 'Transactions rate',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'transactions/sec',
+        'data': []
+    },
+    'match_rate': {
+        'title': 'Matching responses',
+        'xheader': 'time (sec of running test)',
+        'yheader': 'number/sec',
+        'data': []
+    }, ...
+}
+For each key (chart name) in this dict fill data:
+case 'match_rate':
+    # Matching report
+    lines_data = self.one_chart_data(self.names['match'],
+         lambda _name: {
+             'timestamp': self.count[_name]['timestamp'],
+             'data': [x / 10 for x in self.count[_name]['data']]
+         })
+charts_data[chart_name]['data'] = lines_data
+The charts_data will pass to create_report function.
+
+5.  create_report(log_dirname, log_datetime, tsung.tables(list(config['tables'])), tsung.charts(list(config['charts'])))
 """
 from collections import namedtuple
 import json
-from collections.abc import Sequence
-from enum import Enum
+from collections.abc import Collection
 from pathlib import Path
 
 from utils import str_number, str_sec, number, str_bytes, str_bits_per_sec
@@ -268,7 +371,7 @@ class Tsung:
         self.data.append(data)
         # print(json.dumps(self.data, indent=4))
 
-    def process(self, ignore_transactions: list[str] | None = None):
+    def process(self, ignore_transactions: Collection[str] | None = None):
         """Calculate mean and rate lists."""
         ignore_transactions = ignore_transactions or []
         
@@ -458,7 +561,7 @@ class Tsung:
 
         return table
 
-    def one_chart_data(self, names: Sequence[str], get_data_by_name) -> list[dict]:
+    def one_chart_data(self, names: Collection[str], get_data_by_name) -> list[dict]:
         """Build (x,y) data for all chart series by names and get_data_by_name function."""
         lines_data = []
         for name in sorted(names):

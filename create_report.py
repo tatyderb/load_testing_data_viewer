@@ -6,8 +6,10 @@ from jinja2 import Environment, FileSystemLoader
 from locust_data import Locust
 from tsung_data import Tsung
 
+base_dir = Path(__file__).parent
+
 def create_report(report_dirname: Path, report_date: str, tables: dict, charts: dict):
-    environment = Environment(loader=FileSystemLoader("templates/"))
+    environment = Environment(loader=FileSystemLoader(base_dir / "templates/"))
     template = environment.get_template("main.html")
 
     filename = f"report_{report_date}.html"
@@ -32,7 +34,11 @@ if __name__ == "__main__":
     log_datetime = log_dirname.name
 
     config = configparser.RawConfigParser(allow_no_value=True)
-    config.read('report.ini')
+    # или файл в текущей директории, или файл по умолчанию
+    file = Path('report.ini')
+    if not file.exists():
+        file = base_dir / file
+    config.read(file)
 
     match args.framework:
         case 'tsung':
@@ -44,7 +50,9 @@ if __name__ == "__main__":
         case 'locust':
             locust = Locust()
             locust.parse(log_dirname)
-            locust.process(ignore_transactions=set(config['tr_ignore']))
-            # create_report(log_dirname, log_datetime, locust.tables(list(config['tables'])), locust.charts(list(config['charts'])))
+            # locust.process(ignore_transactions=set(config['tr_ignore']))
+            locust.process()
             charts_names = ['transactions_rate', 'transactions_p50']
+            # create_report(log_dirname, log_datetime, locust.tables(list(config['tables'])), locust.charts(list(config['charts'])))
             create_report(log_dirname.parent, log_datetime, locust.tables(list(config['tables'])), locust.charts(charts_names))
+            # create_report(log_dirname.parent, log_datetime, locust.tables(list()), locust.charts(charts_names))

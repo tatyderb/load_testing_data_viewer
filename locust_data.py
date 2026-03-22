@@ -51,8 +51,10 @@ charts = {
         'data': []
     },
 }
-COLUMN_HEADERS = 'type name timestamp user_count rps fail_rps p50 p66 p75 p80 p90 p95 p98 p99 p999 p9999 p100 total_count total_falure_count total_median_response_time total_avr_response_time total_min_response_time total_max_response_time total_avr_content_size'
-DATA_HEADERS = 'user_count rps fail_rps p50 p66 p75 p80 p90 p95 p98 p99 p999 p9999 p100 total_count total_falure_count total_median_response_time total_avr_response_time total_min_response_time total_max_response_time total_avr_content_size'.split()
+# PERCENTILE_HEADERS = 'p50 p66 p75 p80 p90 p95 p98 p99 p999 p9999 p100'
+PERCENTILE_HEADERS = 'p50 p60 p70 p80 p90 p100'
+COLUMN_HEADERS = f'type name timestamp user_count rps fail_rps {PERCENTILE_HEADERS} total_count total_falure_count total_median_response_time total_avr_response_time total_min_response_time total_max_response_time total_avr_content_size'
+DATA_HEADERS = f'user_count rps fail_rps {PERCENTILE_HEADERS} total_count total_falure_count total_median_response_time total_avr_response_time total_min_response_time total_max_response_time total_avr_content_size'.split()
 Data = namedtuple('Data', 'type name timestamp user_count rps fail_rps p50 p66 p75 p80 p90 p95 p98 p99 p999 p9999 p100 total_count total_falure_count total_median_response_time total_avr_response_time total_min_response_time total_max_response_time total_avr_content_size')
 ValueAtTime = namedtuple('ValueAtTime', 'timestamp value')
 
